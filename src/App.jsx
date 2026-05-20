@@ -9,12 +9,12 @@ import {
 
 // ─── Seed Data ────────────────────────────────────────────────────────────────
 const initialTrades = [
-  { id: "TRD-001", symbol: "RELIANCE", exchange: "NSE", direction: "Long", setup: "Breakout", entryPrice: 2850.00, exitPrice: 2980.00, stopLoss: 2800.00, target: 2990.00, quantity: 100, pnl: 13000, status: "Closed", date: "2026-05-01", rMultiple: 2.6, mistake: "None", notes: "Clean breakout above 200 DMA with volume surge." },
-  { id: "TRD-002", symbol: "TCS", exchange: "NSE", direction: "Long", setup: "Pullback", entryPrice: 3900.00, exitPrice: 3985.00, stopLoss: 3860.00, target: 4020.00, quantity: 50, pnl: 4250, status: "Closed", date: "2026-05-03", rMultiple: 1.5, mistake: "None", notes: "Textbook pullback to 20 EMA in uptrend." },
-  { id: "TRD-003", symbol: "INFY", exchange: "NSE", direction: "Long", setup: "Trend Continuation", entryPrice: 1620.00, exitPrice: 1580.00, stopLoss: 1590.00, target: 1700.00, quantity: 150, pnl: -6000, status: "Closed", date: "2026-05-07", rMultiple: -2.0, mistake: "Entry too late", notes: "Stop hit. News event reversed trend." },
-  { id: "TRD-004", symbol: "BAJFINANCE", exchange: "NSE", direction: "Short", setup: "Resistance Rejection", entryPrice: 7200.00, exitPrice: 7050.00, stopLoss: 7280.00, target: 7000.00, quantity: 30, pnl: 4500, status: "Closed", date: "2026-05-10", rMultiple: 1.9, mistake: "None", notes: "Double top rejection at key resistance." },
-  { id: "TRD-006", symbol: "ZOMATO", exchange: "NSE", direction: "Long", setup: "Momentum", entryPrice: 195.50, exitPrice: null, stopLoss: 188.00, target: 215.00, quantity: 1000, pnl: 0, status: "Open", date: "2026-05-17", rMultiple: 0, mistake: "None", notes: "Momentum play after strong Q4 results." },
-  { id: "TRD-007", symbol: "HDFCBANK", exchange: "BSE", direction: "Short", setup: "Resistance Rejection", entryPrice: 1520.00, exitPrice: null, stopLoss: 1545.00, target: 1475.00, quantity: 200, pnl: 0, status: "Open", date: "2026-05-18", rMultiple: 0, mistake: "None", notes: "Supply zone + bearish engulfing candle." },
+  { id: "TRD-001", symbol: "RELIANCE", exchange: "NSE", direction: "Long", setup: "Breakout", entryPrice: 2850.00, exitPrice: 2980.00, stopLoss: 2800.00, target: 2990.00, quantity: 100, marginRequired: null, pnl: 13000, status: "Closed", date: "2026-05-01", rMultiple: 2.6, mistake: "None", notes: "Clean breakout above 200 DMA with volume surge.", tranches: [] },
+  { id: "TRD-002", symbol: "TCS", exchange: "NSE", direction: "Long", setup: "Pullback", entryPrice: 3900.00, exitPrice: 3985.00, stopLoss: 3860.00, target: 4020.00, quantity: 50, marginRequired: null, pnl: 4250, status: "Closed", date: "2026-05-03", rMultiple: 1.5, mistake: "None", notes: "Textbook pullback to 20 EMA in uptrend.", tranches: [] },
+  { id: "TRD-003", symbol: "INFY", exchange: "NSE", direction: "Long", setup: "Trend Continuation", entryPrice: 1620.00, exitPrice: 1580.00, stopLoss: 1590.00, target: 1700.00, quantity: 150, marginRequired: null, pnl: -6000, status: "Closed", date: "2026-05-07", rMultiple: -2.0, mistake: "Entry too late", notes: "Stop hit. News event reversed trend.", tranches: [] },
+  { id: "TRD-004", symbol: "BAJFINANCE", exchange: "NSE", direction: "Short", setup: "Resistance Rejection", entryPrice: 7200.00, exitPrice: 7050.00, stopLoss: 7280.00, target: 7000.00, quantity: 30, marginRequired: null, pnl: 4500, status: "Closed", date: "2026-05-10", rMultiple: 1.9, mistake: "None", notes: "Double top rejection at key resistance.", tranches: [] },
+  { id: "TRD-006", symbol: "ZOMATO", exchange: "NSE", direction: "Long", setup: "Momentum", entryPrice: 195.50, exitPrice: null, stopLoss: 188.00, target: 215.00, quantity: 1000, marginRequired: null, pnl: 0, status: "Open", date: "2026-05-17", rMultiple: 0, mistake: "None", notes: "Momentum play after strong Q4 results.", tranches: [] },
+  { id: "TRD-007", symbol: "HDFCBANK", exchange: "BSE", direction: "Short", setup: "Resistance Rejection", entryPrice: 1520.00, exitPrice: null, stopLoss: 1545.00, target: 1475.00, quantity: 200, marginRequired: null, pnl: 0, status: "Open", date: "2026-05-18", rMultiple: 0, mistake: "None", notes: "Supply zone + bearish engulfing candle.", tranches: [] },
 ];
 
 const SETUPS = ["Breakout", "Pullback", "Momentum", "Trend Continuation", "Resistance Rejection", "Gap Fill", "Mean Reversion", "Reversal"];
@@ -129,7 +129,7 @@ export default function App() {
   const blankForm = {
     symbol: "", exchange: "NSE", direction: "Long", setup: "Breakout",
     entryPrice: "", exitPrice: "", stopLoss: "", target: "",
-    quantity: "", status: "Open",
+    quantity: "", marginRequired: "", status: "Open",
     date: new Date().toISOString().split("T")[0],
     mistake: "None", notes: "",
   };
@@ -208,22 +208,30 @@ export default function App() {
     else { setSortField(field); setSortDir("desc"); }
   };
 
-  const buildTradeObject = (formData, id) => {
+  const buildTradeObject = (formData, id, existingTranches) => {
     const entry = parseFloat(formData.entryPrice);
     const exit = formData.exitPrice ? parseFloat(formData.exitPrice) : null;
     const sl = formData.stopLoss ? parseFloat(formData.stopLoss) : null;
     const qty = parseInt(formData.quantity);
+    const margin = formData.marginRequired ? parseFloat(formData.marginRequired) : null;
     const calcPnl = formData.status === "Closed" && exit != null
       ? (formData.direction === "Long" ? (exit - entry) : (entry - exit)) * qty : 0;
     const risk = sl ? Math.abs(entry - sl) * qty : 2000;
     const rMul = formData.status === "Closed" && exit != null ? (calcPnl / risk).toFixed(1) : 0;
+    // ROI: if margin provided (MTF), ROI = pnl / margin; else ROI = pnl / (entry * qty)
+    const roiBase = margin ? margin : entry * qty;
+    const roi = formData.status === "Closed" && exit != null && roiBase > 0
+      ? ((calcPnl / roiBase) * 100).toFixed(2) : null;
+    // First tranche = this entry itself
+    const tranche = { price: entry, qty, date: formData.date, margin };
     return {
       id: id || `TRD-${Date.now().toString().slice(-5)}`,
       symbol: formData.symbol.toUpperCase().trim(),
       exchange: formData.exchange, direction: formData.direction, setup: formData.setup,
       entryPrice: entry, exitPrice: exit, stopLoss: sl, target: formData.target ? parseFloat(formData.target) : null,
-      quantity: qty, pnl: calcPnl, status: formData.status,
+      quantity: qty, marginRequired: margin, pnl: calcPnl, roi, status: formData.status,
       date: formData.date, rMultiple: parseFloat(rMul), mistake: formData.mistake, notes: formData.notes,
+      tranches: existingTranches ? [...existingTranches, tranche] : [tranche],
     };
   };
 
@@ -269,15 +277,34 @@ export default function App() {
     const newSl = newTradeData.stopLoss || existingTrade.stopLoss;
     const newTarget = newTradeData.target || existingTrade.target;
     const risk = newSl ? Math.abs(avgEntry - newSl) * totalQty : 2000;
+    // Aggregate margin: sum existing + new (if both provided), else null
+    const existingMargin = existingTrade.marginRequired;
+    const newMargin = newTradeData.marginRequired;
+    const aggregatedMargin = (existingMargin != null && newMargin != null)
+      ? existingMargin + newMargin
+      : (existingMargin != null ? existingMargin + (newMargin || 0) : (newMargin != null ? newMargin : null));
+    // Build new tranche entry
+    const newTranche = { price: newTradeData.entryPrice, qty: newTradeData.quantity, date: newTradeData.date, margin: newMargin };
+    const updatedTranches = [...(existingTrade.tranches || [{ price: existingTrade.entryPrice, qty: existingTrade.quantity, date: existingTrade.date, margin: existingMargin }]), newTranche];
+    // Recalc ROI if closed
+    const calcPnl = existingTrade.status === "Closed" && existingTrade.exitPrice
+      ? (existingTrade.direction === "Long" ? existingTrade.exitPrice - avgEntry : avgEntry - existingTrade.exitPrice) * totalQty
+      : existingTrade.pnl;
+    const roiBase = aggregatedMargin ? aggregatedMargin : avgEntry * totalQty;
+    const roi = existingTrade.status === "Closed" && existingTrade.exitPrice && roiBase > 0
+      ? ((calcPnl / roiBase) * 100).toFixed(2) : existingTrade.roi;
     const updatedTrade = {
       ...existingTrade,
       entryPrice: parseFloat(avgEntry.toFixed(2)),
       quantity: totalQty,
       stopLoss: newSl,
       target: newTarget,
+      marginRequired: aggregatedMargin,
+      roi,
+      tranches: updatedTranches,
       notes: existingTrade.notes
-        ? `${existingTrade.notes}\n[Add-on @ ₹${newTradeData.entryPrice} × ${newTradeData.quantity} on ${newTradeData.date}]`
-        : `[Add-on @ ₹${newTradeData.entryPrice} × ${newTradeData.quantity} on ${newTradeData.date}]`,
+        ? `${existingTrade.notes}\n[Tranche @ ₹${newTradeData.entryPrice} × ${newTradeData.quantity} on ${newTradeData.date}${newMargin ? ` · Margin ₹${fmt(newMargin)}` : ""}]`
+        : `[Tranche @ ₹${newTradeData.entryPrice} × ${newTradeData.quantity} on ${newTradeData.date}${newMargin ? ` · Margin ₹${fmt(newMargin)}` : ""}]`,
     };
     setTrades((prev) => prev.map((t) => (t.id === existingTrade.id ? updatedTrade : t)));
     setDuplicateModal(null);
@@ -299,7 +326,7 @@ export default function App() {
       symbol: trade.symbol, exchange: trade.exchange, direction: trade.direction,
       setup: trade.setup, entryPrice: trade.entryPrice, exitPrice: trade.exitPrice || "",
       stopLoss: trade.stopLoss || "", target: trade.target || "",
-      quantity: trade.quantity, status: trade.status, date: trade.date,
+      quantity: trade.quantity, marginRequired: trade.marginRequired || "", status: trade.status, date: trade.date,
       mistake: trade.mistake, notes: trade.notes || "",
     });
     setTab("add-trade");
@@ -634,6 +661,33 @@ export default function App() {
                 </div>
               </div>
 
+              {/* MTF Margin Row */}
+              <div className="rounded-xl border border-violet-500/20 bg-violet-500/5 p-4 space-y-3">
+                <div className="flex items-center gap-2 mb-1">
+                  <div className="h-5 w-5 rounded-md bg-violet-500/20 flex items-center justify-center">
+                    <Zap className="h-3 w-3 text-violet-400" />
+                  </div>
+                  <span className="text-xs font-bold uppercase tracking-wider text-violet-400">MTF / Margin Trade</span>
+                  <span className="text-[10px] text-slate-500 ml-1">— leave blank for full-capital trade</span>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Margin Required (Capital Deployed) ₹</label>
+                  <input
+                    type="number"
+                    step="any"
+                    value={form.marginRequired}
+                    onChange={(e) => setForm({ ...form, marginRequired: e.target.value })}
+                    placeholder={form.entryPrice && form.quantity ? `Full value: ₹${fmt(parseFloat(form.entryPrice || 0) * parseInt(form.quantity || 0))}` : "e.g. 50000"}
+                    className="w-full bg-slate-900 border border-violet-500/30 rounded-xl px-4 py-2.5 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-violet-500 transition-colors"
+                  />
+                  {form.marginRequired && form.entryPrice && form.quantity && (
+                    <p className="text-[10px] text-violet-400 mt-1.5">
+                      Leverage: {(parseFloat(form.entryPrice) * parseInt(form.quantity) / parseFloat(form.marginRequired)).toFixed(1)}× · Full position value: ₹{fmt(parseFloat(form.entryPrice) * parseInt(form.quantity))}
+                    </p>
+                  )}
+                </div>
+              </div>
+
               {/* Row 5 */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -661,11 +715,20 @@ export default function App() {
                 <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/60">
                   {(() => {
                     const ep = parseFloat(form.entryPrice), xp = parseFloat(form.exitPrice), q = parseInt(form.quantity);
+                    const margin = form.marginRequired ? parseFloat(form.marginRequired) : null;
                     const pnl = (form.direction === "Long" ? xp - ep : ep - xp) * q;
+                    const roiBase = margin ? margin : ep * q;
+                    const roi = ((pnl / roiBase) * 100).toFixed(2);
                     return (
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs text-slate-500 font-semibold uppercase tracking-wider">Calculated P&L Preview</span>
-                        <span className={`font-bold text-lg ${pnl >= 0 ? "text-emerald-400" : "text-rose-400"}`}>{fmtPnl(pnl)}</span>
+                      <div className="flex items-center justify-between gap-4">
+                        <div>
+                          <span className="text-xs text-slate-500 font-semibold uppercase tracking-wider">Calculated P&L</span>
+                          <p className={`font-bold text-lg ${pnl >= 0 ? "text-emerald-400" : "text-rose-400"}`}>{fmtPnl(pnl)}</p>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-xs text-slate-500 font-semibold uppercase tracking-wider">ROI {margin ? "(on Margin)" : "(on Capital)"}</span>
+                          <p className={`font-bold text-lg ${parseFloat(roi) >= 0 ? "text-emerald-400" : "text-rose-400"}`}>{roi}%</p>
+                        </div>
                       </div>
                     );
                   })()}
@@ -786,13 +849,87 @@ export default function App() {
                           {isExpanded && (
                             <tr key={`${t.id}-expand`} className="bg-slate-900/30">
                               <td colSpan={9} className="px-6 py-4">
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs mb-4">
                                   <div><p className="text-slate-600 uppercase tracking-wider mb-1">Stop Loss</p><p className="text-slate-300 font-medium">{t.stopLoss ? `₹${fmt(t.stopLoss)}` : "—"}</p></div>
                                   <div><p className="text-slate-600 uppercase tracking-wider mb-1">Target</p><p className="text-slate-300 font-medium">{t.target ? `₹${fmt(t.target)}` : "—"}</p></div>
+                                  <div>
+                                    <p className="text-slate-600 uppercase tracking-wider mb-1">Margin Deployed</p>
+                                    <p className={`font-medium ${t.marginRequired ? "text-violet-400" : "text-slate-500"}`}>
+                                      {t.marginRequired ? `₹${fmt(t.marginRequired)}` : "Full Capital"}
+                                    </p>
+                                    {t.marginRequired && <p className="text-[10px] text-slate-600 mt-0.5">{(t.entryPrice * t.quantity / t.marginRequired).toFixed(1)}× leverage</p>}
+                                  </div>
+                                  <div>
+                                    <p className="text-slate-600 uppercase tracking-wider mb-1">ROI {t.marginRequired ? "(MTF)" : ""}</p>
+                                    <p className={`font-bold ${t.roi != null ? (parseFloat(t.roi) >= 0 ? "text-emerald-400" : "text-rose-400") : "text-slate-500"}`}>
+                                      {t.roi != null ? `${t.roi}%` : t.status === "Open" ? (() => {
+                                        const { price: ltp } = getLtp(t.symbol, t.entryPrice);
+                                        const upnl = (t.direction === "Long" ? ltp - t.entryPrice : t.entryPrice - ltp) * t.quantity;
+                                        const base = t.marginRequired ? t.marginRequired : t.entryPrice * t.quantity;
+                                        return `${((upnl / base) * 100).toFixed(2)}% (live)`;
+                                      })() : "—"}
+                                    </p>
+                                  </div>
                                   <div><p className="text-slate-600 uppercase tracking-wider mb-1">Mistake</p><p className={`font-medium ${t.mistake !== "None" ? "text-amber-400" : "text-slate-400"}`}>{t.mistake}</p></div>
                                   <div><p className="text-slate-600 uppercase tracking-wider mb-1">Trade ID</p><p className="text-slate-400 font-mono">{t.id}</p></div>
-                                  {t.notes && <div className="col-span-2 md:col-span-4"><p className="text-slate-600 uppercase tracking-wider mb-1">Notes</p><p className="text-slate-300 leading-relaxed">{t.notes}</p></div>}
+                                  {t.notes && <div className="col-span-2 md:col-span-4"><p className="text-slate-600 uppercase tracking-wider mb-1">Notes</p><p className="text-slate-300 leading-relaxed whitespace-pre-line">{t.notes}</p></div>}
                                 </div>
+                                {/* Tranches breakdown */}
+                                {t.tranches && t.tranches.length > 1 && (
+                                  <div className="mt-2">
+                                    <p className="text-[10px] uppercase tracking-widest text-slate-500 font-semibold mb-2">Entry Tranches ({t.tranches.length})</p>
+                                    <div className="bg-slate-800/40 rounded-xl border border-slate-700/40 overflow-hidden">
+                                      <table className="w-full text-xs">
+                                        <thead>
+                                          <tr className="border-b border-slate-700/40 text-[10px] text-slate-600 uppercase tracking-wider">
+                                            <th className="px-3 py-2 text-left font-semibold">#</th>
+                                            <th className="px-3 py-2 text-left font-semibold">Date</th>
+                                            <th className="px-3 py-2 text-right font-semibold">Price</th>
+                                            <th className="px-3 py-2 text-right font-semibold">Qty</th>
+                                            <th className="px-3 py-2 text-right font-semibold">Value</th>
+                                            <th className="px-3 py-2 text-right font-semibold">Margin</th>
+                                            <th className="px-3 py-2 text-right font-semibold">Weight</th>
+                                          </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-700/30">
+                                          {t.tranches.map((tr, i) => {
+                                            const val = tr.price * tr.qty;
+                                            const totalVal = t.tranches.reduce((s, x) => s + x.price * x.qty, 0);
+                                            const weight = ((val / totalVal) * 100).toFixed(1);
+                                            return (
+                                              <tr key={i} className="hover:bg-slate-700/20 transition-colors">
+                                                <td className="px-3 py-2 text-slate-500">T{i + 1}</td>
+                                                <td className="px-3 py-2 text-slate-400">{tr.date}</td>
+                                                <td className="px-3 py-2 text-right text-slate-300 font-medium">₹{fmt(tr.price)}</td>
+                                                <td className="px-3 py-2 text-right text-slate-300">{tr.qty}</td>
+                                                <td className="px-3 py-2 text-right text-slate-400">₹{fmt(val)}</td>
+                                                <td className="px-3 py-2 text-right">
+                                                  {tr.margin ? <span className="text-violet-400">₹{fmt(tr.margin)}</span> : <span className="text-slate-600">—</span>}
+                                                </td>
+                                                <td className="px-3 py-2 text-right">
+                                                  <div className="flex items-center justify-end gap-1.5">
+                                                    <div className="h-1.5 rounded-full bg-emerald-500/60" style={{ width: `${parseFloat(weight) * 0.5}px`, minWidth: 4 }} />
+                                                    <span className="text-slate-500">{weight}%</span>
+                                                  </div>
+                                                </td>
+                                              </tr>
+                                            );
+                                          })}
+                                        </tbody>
+                                        <tfoot className="border-t border-slate-700/40">
+                                          <tr className="text-[10px] text-slate-500 font-semibold">
+                                            <td colSpan={2} className="px-3 py-2 uppercase tracking-wider text-emerald-400">Avg Entry</td>
+                                            <td className="px-3 py-2 text-right text-emerald-400">₹{fmt(t.entryPrice)}</td>
+                                            <td className="px-3 py-2 text-right text-emerald-400">{t.quantity}</td>
+                                            <td className="px-3 py-2 text-right text-slate-400">₹{fmt(t.entryPrice * t.quantity)}</td>
+                                            <td className="px-3 py-2 text-right text-violet-400">{t.marginRequired ? `₹${fmt(t.marginRequired)}` : "—"}</td>
+                                            <td className="px-3 py-2 text-right text-slate-500">100%</td>
+                                          </tr>
+                                        </tfoot>
+                                      </table>
+                                    </div>
+                                  </div>
+                                )}
                               </td>
                             </tr>
                           )}
