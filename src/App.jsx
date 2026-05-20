@@ -74,43 +74,31 @@ function Badge({ children, variant = "default" }) {
 // We cascade through 3 public CORS proxies each wrapping Yahoo Finance.
 // If all 3 fail, the manual override is used. Source shown per-symbol in UI.
 
-const YAHOO_BASE = "https://query1.finance.yahoo.com/v7/finance/quote?symbols=";
-
-const PROXIES = [
-  {
-    name: "MyWorker",
-    wrap: (url) => `https://little-dawn-4310.losser997.workers.dev/?url=${encodeURIComponent(url)}`,
-    parse: (data) => data?.quoteResponse?.result,
-  },
-];
-
-async function fetchViaProxy(proxy, symbols) {
-  const yahooUrl = `${YAHOO_BASE}${symbols}`;
-  const res = await fetch(proxy.wrap(yahooUrl), { signal: AbortSignal.timeout(6000) });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const data = await res.json();
-  const result = proxy.parse(data);
-  if (!result || result.length === 0) throw new Error("No results");
-  return result;
-}
+const WORKER_URL = "https://little-dawn-4310.losser997.workers.dev/";
 
 async function fetchLTPCascade(symbolList) {
-  // symbolList: [{ raw: "RELIANCE", yahoo: "RELIANCE.NS" }, ...]
-  const yahooSymbols = [...new Set(symbolList.map((s) => s.yahoo))].join(",");
-  for (const proxy of PROXIES) {
+  const map = {};
+  for (const s of symbolList) {
     try {
-      const result = await fetchViaProxy(proxy, yahooSymbols);
-      const map = {};
-      result.forEach((q) => {
-        const raw = q.symbol.replace(/\.(NS|BO)$/, "");
-        map[raw] = { price: q.regularMarketPrice, change: q.regularMarketChange, changePct: q.regularMarketChangePercent, source: proxy.name, high: q.regularMarketDayHigh, low: q.regularMarketDayLow };
+      const nseUrl = `https://www.nseindia.com/api/quote-equity?symbol=${encodeURIComponent(s.raw)}`;
+      const res = await fetch(`${WORKER_URL}?url=${encodeURIComponent(nseUrl)}`, {
+        signal: AbortSignal.timeout(6000),
       });
-      return { map, source: proxy.name, error: null };
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      const ltp = data?.priceInfo?.lastPrice;
+      const change = data?.priceInfo?.change;
+      const changePct = data?.priceInfo?.pChange;
+      const high = data?.priceInfo?.intraDayHighLow?.max;
+      const low = data?.priceInfo?.intraDayHighLow?.min;
+      if (!ltp) throw new Error("No price");
+      map[s.raw] = { price: ltp, change, changePct, source: "NSE", high, low };
     } catch (e) {
-      // try next proxy
+      // skip this symbol
     }
   }
-  return { map: {}, source: null, error: "All proxies failed" };
+  if (Object.keys(map).length === 0) return { map: {}, source: null, error: "All proxies failed" };
+  return { map, source: "NSE", error: null };
 }
 
 // ─── Main App ─────────────────────────────────────────────────────────────────
