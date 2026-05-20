@@ -78,18 +78,8 @@ const YAHOO_BASE = "https://query1.finance.yahoo.com/v7/finance/quote?symbols=";
 
 const PROXIES = [
   {
-    name: "AllOrigins",
-    wrap: (url) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-    parse: (data) => data?.quoteResponse?.result,
-  },
-  {
-    name: "corsproxy.io",
-    wrap: (url) => `https://corsproxy.io/?${encodeURIComponent(url)}`,
-    parse: (data) => data?.quoteResponse?.result,
-  },
-  {
-    name: "ThingProxy",
-    wrap: (url) => `https://thingproxy.freeboard.io/fetch/${url}`,
+    name: "MyWorker",
+    wrap: (url) => `https://little-dawn-4310.losser997.workers.dev/?url=${encodeURIComponent(url)}`,
     parse: (data) => data?.quoteResponse?.result,
   },
 ];
