@@ -124,6 +124,7 @@ export default function App() {
   const [expandedRow, setExpandedRow] = useState(null);
   const [formError, setFormError] = useState("");
   const [showSuccess, setShowSuccess] = useState(false);
+  const [duplicateModal, setDuplicateModal] = useState(null); // { existingTrade, newTradeData }
 
   const blankForm = {
     symbol: "", exchange: "NSE", direction: "Long", setup: "Breakout",
@@ -207,6 +208,37 @@ export default function App() {
     else { setSortField(field); setSortDir("desc"); }
   };
 
+  const buildTradeObject = (formData, id) => {
+    const entry = parseFloat(formData.entryPrice);
+    const exit = formData.exitPrice ? parseFloat(formData.exitPrice) : null;
+    const sl = formData.stopLoss ? parseFloat(formData.stopLoss) : null;
+    const qty = parseInt(formData.quantity);
+    const calcPnl = formData.status === "Closed" && exit != null
+      ? (formData.direction === "Long" ? (exit - entry) : (entry - exit)) * qty : 0;
+    const risk = sl ? Math.abs(entry - sl) * qty : 2000;
+    const rMul = formData.status === "Closed" && exit != null ? (calcPnl / risk).toFixed(1) : 0;
+    return {
+      id: id || `TRD-${Date.now().toString().slice(-5)}`,
+      symbol: formData.symbol.toUpperCase().trim(),
+      exchange: formData.exchange, direction: formData.direction, setup: formData.setup,
+      entryPrice: entry, exitPrice: exit, stopLoss: sl, target: formData.target ? parseFloat(formData.target) : null,
+      quantity: qty, pnl: calcPnl, status: formData.status,
+      date: formData.date, rMultiple: parseFloat(rMul), mistake: formData.mistake, notes: formData.notes,
+    };
+  };
+
+  const commitTrade = (trade) => {
+    if (editingTrade) {
+      setTrades((prev) => prev.map((t) => (t.id === trade.id ? trade : t)));
+      setEditingTrade(null);
+    } else {
+      setTrades((prev) => [trade, ...prev]);
+    }
+    setForm(blankForm);
+    setShowSuccess(true);
+    setTimeout(() => { setShowSuccess(false); setTab("log"); }, 1200);
+  };
+
   const handleSubmit = () => {
     setFormError("");
     if (!form.symbol.trim()) return setFormError("Symbol is required.");
@@ -214,34 +246,49 @@ export default function App() {
     if (!form.quantity || isNaN(form.quantity)) return setFormError("Valid quantity is required.");
     if (form.status === "Closed" && (!form.exitPrice || isNaN(form.exitPrice))) return setFormError("Exit price is required for closed trades.");
 
-    const entry = parseFloat(form.entryPrice);
-    const exit = form.exitPrice ? parseFloat(form.exitPrice) : null;
-    const sl = form.stopLoss ? parseFloat(form.stopLoss) : null;
-    const qty = parseInt(form.quantity);
-    const calcPnl = form.status === "Closed" && exit != null
-      ? (form.direction === "Long" ? (exit - entry) : (entry - exit)) * qty : 0;
-    const risk = sl ? Math.abs(entry - sl) * qty : 2000;
-    const rMul = form.status === "Closed" && exit != null ? (calcPnl / risk).toFixed(1) : 0;
+    const newTrade = buildTradeObject(form, editingTrade?.id);
 
-    const trade = {
-      id: editingTrade ? editingTrade.id : `TRD-${Date.now().toString().slice(-5)}`,
-      symbol: form.symbol.toUpperCase().trim(),
-      exchange: form.exchange, direction: form.direction, setup: form.setup,
-      entryPrice: entry, exitPrice: exit, stopLoss: sl, target: form.target ? parseFloat(form.target) : null,
-      quantity: qty, pnl: calcPnl, status: form.status,
-      date: form.date, rMultiple: parseFloat(rMul), mistake: form.mistake, notes: form.notes,
-    };
-
-    if (editingTrade) {
-      setTrades((prev) => prev.map((t) => (t.id === trade.id ? trade : t)));
-      setEditingTrade(null);
-    } else {
-      setTrades((prev) => [trade, ...prev]);
+    // Check for existing open trade with same symbol (only for new trades, not edits)
+    if (!editingTrade) {
+      const existing = trades.find(
+        (t) => t.status === "Open" && t.symbol === newTrade.symbol && t.direction === newTrade.direction
+      );
+      if (existing) {
+        setDuplicateModal({ existingTrade: existing, newTradeData: newTrade });
+        return;
+      }
     }
 
+    commitTrade(newTrade);
+  };
+
+  const handleAddToExisting = () => {
+    const { existingTrade, newTradeData } = duplicateModal;
+    const totalQty = existingTrade.quantity + newTradeData.quantity;
+    const avgEntry = ((existingTrade.entryPrice * existingTrade.quantity) + (newTradeData.entryPrice * newTradeData.quantity)) / totalQty;
+    const newSl = newTradeData.stopLoss || existingTrade.stopLoss;
+    const newTarget = newTradeData.target || existingTrade.target;
+    const risk = newSl ? Math.abs(avgEntry - newSl) * totalQty : 2000;
+    const updatedTrade = {
+      ...existingTrade,
+      entryPrice: parseFloat(avgEntry.toFixed(2)),
+      quantity: totalQty,
+      stopLoss: newSl,
+      target: newTarget,
+      notes: existingTrade.notes
+        ? `${existingTrade.notes}\n[Add-on @ ₹${newTradeData.entryPrice} × ${newTradeData.quantity} on ${newTradeData.date}]`
+        : `[Add-on @ ₹${newTradeData.entryPrice} × ${newTradeData.quantity} on ${newTradeData.date}]`,
+    };
+    setTrades((prev) => prev.map((t) => (t.id === existingTrade.id ? updatedTrade : t)));
+    setDuplicateModal(null);
     setForm(blankForm);
     setShowSuccess(true);
     setTimeout(() => { setShowSuccess(false); setTab("log"); }, 1200);
+  };
+
+  const handleSeparateTrade = () => {
+    commitTrade(duplicateModal.newTradeData);
+    setDuplicateModal(null);
   };
 
   const handleDelete = (id) => { setTrades((prev) => prev.filter((t) => t.id !== id)); setDeleteId(null); };
@@ -921,6 +968,61 @@ export default function App() {
           </div>
         )}
       </main>
+
+      {/* ── Duplicate Trade Modal ── */}
+      {duplicateModal && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-[#0d1117] border border-slate-700 rounded-2xl p-6 w-full max-w-md shadow-2xl">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="h-10 w-10 rounded-xl bg-amber-500/10 flex items-center justify-center shrink-0">
+                <AlertTriangle className="h-5 w-5 text-amber-400" />
+              </div>
+              <div>
+                <p className="font-bold text-slate-200">Existing Open Position Found</p>
+                <p className="text-xs text-slate-500">You already have an open {duplicateModal.existingTrade.direction} trade on <span className="text-amber-400 font-semibold">{duplicateModal.existingTrade.symbol}</span></p>
+              </div>
+            </div>
+
+            {/* Existing vs New comparison */}
+            <div className="bg-slate-800/40 rounded-xl p-4 border border-slate-700/60 mb-4 space-y-2 text-xs">
+              <div className="grid grid-cols-3 text-slate-500 font-semibold uppercase tracking-wider text-[10px] pb-1 border-b border-slate-700/40">
+                <span></span><span className="text-center">Existing</span><span className="text-center">New</span>
+              </div>
+              <div className="grid grid-cols-3">
+                <span className="text-slate-500">Entry</span>
+                <span className="text-center text-slate-300">₹{fmt(duplicateModal.existingTrade.entryPrice)}</span>
+                <span className="text-center text-sky-400">₹{fmt(duplicateModal.newTradeData.entryPrice)}</span>
+              </div>
+              <div className="grid grid-cols-3">
+                <span className="text-slate-500">Quantity</span>
+                <span className="text-center text-slate-300">{duplicateModal.existingTrade.quantity}</span>
+                <span className="text-center text-sky-400">{duplicateModal.newTradeData.quantity}</span>
+              </div>
+              <div className="grid grid-cols-3 pt-1 border-t border-slate-700/40 font-semibold">
+                <span className="text-emerald-400">Avg Entry</span>
+                <span className="col-span-2 text-center text-emerald-400">
+                  ₹{(((duplicateModal.existingTrade.entryPrice * duplicateModal.existingTrade.quantity) + (duplicateModal.newTradeData.entryPrice * duplicateModal.newTradeData.quantity)) / (duplicateModal.existingTrade.quantity + duplicateModal.newTradeData.quantity)).toFixed(2)}
+                  {" "}· {duplicateModal.existingTrade.quantity + duplicateModal.newTradeData.quantity} qty
+                </span>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-400 mb-4">Is this an <span className="text-emerald-400 font-semibold">add-on</span> to your existing trade, or a <span className="text-sky-400 font-semibold">separate</span> independent trade?</p>
+
+            <div className="flex flex-col gap-2">
+              <button onClick={handleAddToExisting} className="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold py-2.5 rounded-xl text-sm transition-colors">
+                ✓ Add-on — Update Avg Entry & Qty
+              </button>
+              <button onClick={handleSeparateTrade} className="w-full bg-sky-500/20 hover:bg-sky-500/30 text-sky-400 border border-sky-500/30 font-semibold py-2.5 rounded-xl text-sm transition-colors">
+                Log as Separate Trade
+              </button>
+              <button onClick={() => setDuplicateModal(null)} className="w-full bg-slate-800 hover:bg-slate-700 text-slate-400 font-semibold py-2.5 rounded-xl text-sm transition-colors border border-slate-700">
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Delete Confirmation Modal ── */}
       {deleteId && (
